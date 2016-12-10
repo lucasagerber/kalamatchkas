@@ -1,5 +1,4 @@
 
-
 Kalamatchkas
 ========
 
@@ -22,7 +21,7 @@ In this example I create a diet and make a kalamatchkas based on an ingredient l
     # You'll need a USDA API KEY (get one here:
     # https://ndb.nal.usda.gov/ndb/doc/index#, see "Gaining Access" and click sign up now)
 
-    path = #location of sample ingredients
+    path = #location of sample ingredients file, ingredient_doron v4.xlsx
     ingredients = kalamatchkas.FoodList(path, API_KEY)
 
     # Put these in a kalamatchkas object ... and generate a day of kalamatchkas
