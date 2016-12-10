@@ -1,8 +1,8 @@
 """
-kalamatchkas.FoodList
+kalamatchkas.Diet
 saba pilots
-description:  FoodList object, dataframe of potential ingredients with nutritional information
-12.01.16
+description:  Diet object, information on person's diet
+12.10.16
 """
 
 
