@@ -6,7 +6,7 @@ description:  configuration file for kalamatchas program
 
 
 # file of foods to load
-FOOD_PATH = "C:/Users/Lucas/Documents/GitHub/kalamatchkas/sample/ingredient_doron v4.xlsx"
+FOOD_PATH = "C:/Users/Lucas/Documents/GitHub/kalamatchkas/sample/ingredient_doron v5.xlsx"
 
 # file to output recipes
 OUT_PATH = "C:/Users/Lucas/Documents/GitHub/kalamatchkas/sample/test_out.csv"
@@ -18,7 +18,7 @@ LINE_BEGIN = ">*~@~*> "
 RECIPE_COLUMNS = ['food_id', 'food', 'gram', 'protein', 'fat', 'carb', 'sugar']
 
 # api key for searching usda database
-API_KEY = ''
+API_KEY = "Gb3vhyvcHwFhZNtbD2fqWc3oeNdwYA22qqND1fyU"
 
 # base url for searching usda database
 BASE_URL = "http://api.nal.usda.gov/ndb/"

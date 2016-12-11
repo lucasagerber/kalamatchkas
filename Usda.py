@@ -16,8 +16,13 @@ from .config import BASE_URL
 class Usda(object):
 
     def __init__(self, api_key):
-        self.api_key = api_key
-    
+        self.__api_key = api_key
+
+
+    @property
+    def api_key(self):
+        return self.__api_key
+        
     
     def search(self,
             q,
@@ -67,34 +72,74 @@ class Usda(object):
 class Food(object):
 
     def __init__(self, query_result):
-        self.ndbno = query_result["ndbno"]
-        self.name = query_result["name"]
-        self.gram = 100
+        self.__ndbno = query_result["ndbno"]
+        self.__name = query_result["name"]
+        self.__gram = 100
         
-        self.nutrients = defaultdict(lambda: dict({'value':0}))
+        self.__nutrients = defaultdict(lambda: dict({'value':0}))
         for nutrient in query_result["nutrients"]:
             nutrient["value"] = float(nutrient["value"])
-            self.nutrients[nutrient.pop("nutrient_id")] = nutrient
+            self.__nutrients[nutrient.pop("nutrient_id")] = nutrient
             
-        self.protein = self.nutrients["203"]["value"]
-        self.fat = self.nutrients["204"]["value"]
-        self.carb = self.nutrients["205"]["value"]
-        self.sugar = self.nutrients["269"]["value"]
+        self.__protein = self.__nutrients["203"]["value"]
+        self.__fat = self.__nutrients["204"]["value"]
+        self.__carb = self.__nutrients["205"]["value"]
+        self.__sugar = self.__nutrients["269"]["value"]
         
         print(self)
-    
+
+
+    @property
+    def ndbno(self):
+        return self.__ndbno
+
+
+    @property
+    def name(self):
+        return self.__name
+
+
+    @property
+    def gram(self):
+        return self.__gram
+
+
+    @property
+    def nutrients(self):
+        return self.__nutrients
+
+
+    @property
+    def protein(self):
+        return self.__protein
+
+
+    @property
+    def fat(self):
+        return self.__fat
+
+
+    @property
+    def carb(self):
+        return self.__carb
+
+
+    @property
+    def sugar(self):
+        return self.__sugar
+        
     
     def re_gram(self, gram_amt):
-        gram_ratio = gram_amt / self.gram
-        self.gram = gram_amt
+        gram_ratio = gram_amt / self.__gram
+        self.__gram = gram_amt
         
-        for nutrient in self.nutrients.keys():
-            self.nutrients[nutrient]["value"] *= gram_ratio
+        for nutrient in self.__nutrients.keys():
+            self.__nutrients[nutrient]["value"] *= gram_ratio
         
-        self.protein *= gram_ratio
-        self.fat *= gram_ratio
-        self.carb *= gram_ratio
-        self.sugar *= gram_ratio
+        self.__protein *= gram_ratio
+        self.__fat *= gram_ratio
+        self.__carb *= gram_ratio
+        self.__sugar *= gram_ratio
     
     
     def __str__(self):

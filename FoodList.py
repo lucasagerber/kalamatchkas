@@ -11,12 +11,12 @@ import pandas as pd
 from collections import defaultdict
 from .FoodListBase import FoodListBase
 from .config import LINE_BEGIN
-from .Usda import Usda
+from .Usda import Usda, Food
 
 
 class FoodList(FoodListBase):
 
-    def __init__(self, path, api_key=None):
+    def __init__(self, path, column=None, api_key=None):
         """Load food file into dataframe."""
         assert os.path.exists(path), LINE_BEGIN + "ERROR: unable to find food file in " + path
 
@@ -24,12 +24,13 @@ class FoodList(FoodListBase):
         
         self.dataframe = pd.read_excel(path)
         
-        if api_key:
-            ndb_nos = self.get_ndbnos()
+        if column and api_key:
+            ndb_nos = self.get_ndbnos(column)
             
             usda = Usda(api_key)
             
             foods = [usda.food_report(ndb_no)  for ndb_no in ndb_nos]
+            foods = [food  for food in foods if type(food) == Food]
 
             food_data = defaultdict(lambda: [])
             
@@ -44,12 +45,12 @@ class FoodList(FoodListBase):
                 food_data['sugar'].append(food.sugar)
                 
             self.dataframe = pd.DataFrame(food_data)
-            #print(self.get_df())
+            #print(self.dataframe)
         
         
-    def get_ndbnos(self):
+    def get_ndbnos(self, column):
         """Gather and return a unique list of NDB_NOs from dataframe."""
-        ndb_nos = list(self.get_df()["NBD_NO"].apply(str).apply(str.strip).unique())
+        ndb_nos = list(self.dataframe[column].apply(str).apply(str.strip).unique())
         
         return [ndb_no for ndb_no in ndb_nos if ndb_no.isnumeric()]
 

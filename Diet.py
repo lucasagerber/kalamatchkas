@@ -19,14 +19,42 @@ class Diet(object):
             macronutrient_rules=[('protein_cal_%',.15,.30), ('fat_cal_%',.15,.25), ('carb_cal_%',.45,.60)]
         ):
         """Creates a diet object."""
-        self.name = diet_name
-        self.meals = OrderedDict(meals)
-        self.calories = sum(self.meals.values())
-        self.calorie_error = calorie_error
-        self.calorie_range = [ ('total_cal', self.calories*(1-self.calorie_error), self.calories*(1+self.calorie_error)) ]
-        self.macronutrient_rules = macronutrient_rules
+        self.__name = diet_name
+        self.__meals = OrderedDict(meals)
+        self.__calorie_error = calorie_error
+        self.__macronutrient_rules = macronutrient_rules
         
         print(self)
+
+
+    @property
+    def name(self):
+        return self.__name
+    
+    
+    @property
+    def meals(self):
+        return self.__meals
+    
+    
+    @property
+    def calories(self):
+        return sum(self.__meals.values())
+    
+    
+    @property
+    def calorie_error(self):
+        return self.__calorie_error
+    
+    
+    @property
+    def calorie_range(self):
+        return [ ('total_cal', self.calories*(1-self.calorie_error), self.calories*(1+self.calorie_error)) ]
+    
+    
+    @property
+    def macronutrient_rules(self):
+        return self.__macronutrient_rules
     
     
     def __str__(self):

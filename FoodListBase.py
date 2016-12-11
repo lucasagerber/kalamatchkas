@@ -8,28 +8,37 @@ description:  FoodList object, dataframe of potential ingredients with nutrition
 
 import random, os
 import pandas as pd
-from .config import LINE_BEGIN
+from .config import LINE_BEGIN, RECIPE_COLUMNS
 
 
 class FoodListBase(object):
 
     def __init__(self, dataframe):
         """Load food file into dataframe."""
-        self.dataframe = dataframe
+        self.__dataframe = dataframe
         
         
-    def get_df(self):
-        """Returns dataframe for food list."""
-        return self.dataframe
+    @property
+    def dataframe(self):
+        return self.__dataframe
+    
+    
+    @dataframe.setter
+    def dataframe(self, value):
+        assert (type(value) in (pd.core.frame.DataFrame, pd.core.series.Series) or not value), LINE_BEGIN + "ERROR: non dataframe/series/none assigned to dataframe property"
+        if type(value) in (pd.core.frame.DataFrame, pd.core.series.Series):
+            self.__dataframe = value
+        else:
+            self.__dataframe = pd.DataFrame(columns=RECIPE_COLUMNS)
 
         
     def select_food(self, number):
         """Select a food from the food list."""
         # currently only works for 1 selection. . .
-        assert not self.get_df().empty, LINE_BEGIN + "ERROR: food dataframe is empty"
+        assert not self.dataframe.empty, LINE_BEGIN + "ERROR: food dataframe is empty"
         
-        rand_index = random.choice(list(self.get_df().index.values)) #random.sample(list(self.get_df().index.values), number) would need to modify for multiple...
-        food_df = self.get_df().ix[rand_index]
+        rand_index = random.choice(list(self.dataframe.index.values)) #random.sample(list(self.dataframe.index.values), number) would need to modify for multiple...
+        food_df = self.dataframe.ix[rand_index]
         
         return food_df
 
@@ -38,12 +47,12 @@ class FoodListBase(object):
         """Add chosen food to the food list."""
         assert not food_df.empty, LINE_BEGIN + "ERROR: no food to add"
         
-        if food_df["food"] in self.get_df()["food"].values:
-            updated_df = self.get_df()
+        if food_df["food"] in self.dataframe["food"].values:
+            updated_df = self.dataframe
             fields_update = ['gram', 'protein', 'fat', 'carb', 'sugar']
             updated_df.loc[updated_df["food"]==food_df["food"], fields_update] += food_df[fields_update]
         else:
-            updated_df = self.get_df().append(food_df).reset_index(drop=True)
+            updated_df = self.dataframe.append(food_df).reset_index(drop=True)
         
         self.dataframe = updated_df
         
@@ -55,9 +64,9 @@ class FoodListBase(object):
     def del_food(self, food_df):
         """Delete chosen food from the food list."""
         assert not food_df.empty, LINE_BEGIN + "ERROR: no food to delete"
-        assert food_df["food"] in self.get_df()["food"].values, LINE_BEGIN + "ERROR: food to delete is not in recipe"
+        assert food_df["food"] in self.dataframe["food"].values, LINE_BEGIN + "ERROR: food to delete is not in recipe"
         
-        updated_df = self.get_df()
+        updated_df = self.dataframe
         fields_update = ['gram', 'protein', 'fat', 'carb', 'sugar']
         updated_df.loc[updated_df["food"]==food_df["food"], fields_update] -= food_df[fields_update]
         
@@ -71,7 +80,7 @@ class FoodListBase(object):
 
         
     def calculate_calories(self):
-        """Calculate calories of each food in the food list."""  
+        """Calculate calories of each food in the food list."""
         self.dataframe["protein_cal"] = self.dataframe["protein"] * 4
         self.dataframe["carb_cal"] = (self.dataframe["carb"] + self.dataframe["sugar"]) * 4
         self.dataframe["fat_cal"] = self.dataframe["fat"] * 9
@@ -87,7 +96,7 @@ class FoodListBase(object):
         
     def save(self, output_file):
         """Save food list to csv file."""
-        out_df = self.get_df()
+        out_df = self.dataframe
         out_df.to_csv(output_file)
 
     

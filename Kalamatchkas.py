@@ -17,13 +17,34 @@ from .config import FOOD_PATH, OUT_PATH, LINE_BEGIN, RECIPE_COLUMNS, API_KEY
 
 class Kalamatchkas(object):
 
-    def __init__(self, food_list, diet):        
+    def __init__(self, food_list, diet):
         """Initalize kalamatchkas object."""
-        self.food_list = food_list
-        self.diet = diet
-        self.recipe = Recipe()
+        self.__food_list = food_list
+        self.__diet = diet
+        self.__recipe = Recipe()
+    
+    
+    @property
+    def food_list(self):
+        return self.__food_list
+    
+    
+    @property
+    def diet(self):
+        return self.__diet
+    
 
+    @property
+    def recipe(self):
+        return self.__recipe
 
+    
+    @recipe.setter
+    def recipe(self, value):
+        assert type(value) == Recipe, LINE_BEGIN + "ERROR: non recipe assigned to recipe property"
+        self.__recipe = value
+    
+    
     def day(self):
         """Create a day of random recipes based on dietary rules and calorie requirements."""
         self.create_recipe()
@@ -39,13 +60,13 @@ class Kalamatchkas(object):
         
         self.recipe = Recipe()
         
-        while self.recipe.get_df().empty or self.recipe.get_df()["total_cal"].sum() < self.diet.calories:
+        while self.recipe.dataframe.empty or self.recipe.dataframe["total_cal"].sum() < self.diet.calories:
             new_food_df = self.food_list.select_food(1)
             self.recipe.add_food(new_food_df)
         
         if not self.recipe.test(self.diet):
             print(LINE_BEGIN + "Balancing the macronutrient levels...")
-            original_recipe = Recipe(self.recipe.get_df().copy())
+            original_recipe = Recipe(self.recipe.dataframe.copy())
             
             self.balance_macronutrients()
 
@@ -62,7 +83,7 @@ class Kalamatchkas(object):
         # currently only works for 1 replacement. . .
         n_replaces = 1
         
-        recipe_food_list = self.recipe.get_df()["food"].values
+        recipe_food_list = self.recipe.dataframe["food"].values
         food_df_dict = {food:self.compare_foods(food)  for food in recipe_food_list}
 
         self.recipe.dataframe["compare_df"] = self.recipe.dataframe.apply(lambda x: not food_df_dict[x["food"]].empty, axis=1)
@@ -72,7 +93,7 @@ class Kalamatchkas(object):
         if recipe_df_select.empty:
             print(LINE_BEGIN + "Sorry, there are no options for this recipe")
         else:
-            food_replace_options = Recipe(self.food_list.get_df()[self.food_list.get_df()["food"].isin(recipe_df_select["food"].values)])
+            food_replace_options = Recipe(self.food_list.dataframe[self.food_list.dataframe["food"].isin(recipe_df_select["food"].values)])
             
             food_replace = food_replace_options.select_food(n_replaces)
             food_new_options = Recipe(food_df_dict[food_replace["food"]])
@@ -97,12 +118,12 @@ class Kalamatchkas(object):
         fields_needed = ["protein_cal","carb_cal","fat_cal","total_cal"]
 
         self.food_list.calculate_calories()
-        food_comparison = Recipe(self.food_list.get_df())
-        food_row = self.food_list.get_df().loc[self.food_list.get_df()["food"]==food, fields_needed].iloc[0]
-        food_comparison.dataframe[fields_needed] = food_comparison.get_df()[fields_needed] - food_row + recipe_sum[fields_needed]
+        food_comparison = Recipe(self.food_list.dataframe)
+        food_row = self.food_list.dataframe.loc[self.food_list.dataframe["food"]==food, fields_needed].iloc[0]
+        food_comparison.dataframe[fields_needed] = food_comparison.dataframe[fields_needed] - food_row + recipe_sum[fields_needed]
         food_comparison.calculate_calorie_percents()
         
-        conditionals = bool(True) & ( food_comparison.get_df()["food"] != food )
+        conditionals = bool(True) & ( food_comparison.dataframe["food"] != food )
         
         rules = list()
         rules.extend(self.diet.macronutrient_rules)
@@ -111,23 +132,34 @@ class Kalamatchkas(object):
         for rule in rules:
             target = (rule[1] + rule[2])/2
             old_recipe_diff = abs(recipe_sum[rule[0]] - target)
-            new_recipe_diff = abs(food_comparison.get_df()[rule[0]] - target)
+            new_recipe_diff = abs(food_comparison.dataframe[rule[0]] - target)
             
             conditionals &= (
-                ( (rule[1] <= food_comparison.get_df()[rule[0]]) & (food_comparison.get_df()[rule[0]] <= rule[2]) )
+                ( (rule[1] <= food_comparison.dataframe[rule[0]]) & (food_comparison.dataframe[rule[0]] <= rule[2]) )
                 | (new_recipe_diff <= old_recipe_diff)
             )
 
-        return self.food_list.get_df().loc[conditionals, :]
+        return self.food_list.dataframe.loc[conditionals, :]
+
+
+    def summarize(self, print_out=False, day=False):
+        """Summarize the kalamatchkas recipe."""
+        return self.recipe.summarize(print_out, day)
+    
+    
+    def save(self, path):
+        """Save the kalamatchkas recipe."""
+        return self.recipe.save(path)
+    
     
     
 def main():
     diet = Diet("Doron's Diet")
-    food_list = FoodList(FOOD_PATH, API_KEY)
+    food_list = FoodList(FOOD_PATH, column="NDB_NO", api_key=API_KEY)
     K = Kalamatchkas(food_list, diet)
     K.day()
-    K.recipe.summarize(print_out=True, day=False)
-    K.recipe.save(OUT_PATH)
+    K.summarize(print_out=True, day=False)
+    K.save(OUT_PATH)
     
     
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-
 Kalamatchkas
 ========
 
@@ -32,8 +31,8 @@ In this example I create a diet and make a kalamatchkas based on an ingredient l
 
     # Summarize the nutrient content of the kalamatchkas
     
-    K.recipe.summarize(print_out=True, day=False)
+    K.summarize(print_out=True, day=False)
 
     # Save the kalamatchkas out to a csv file
     
-    K.recipe.save('C:/Documents/wherever/my_kalamatchkas.csv')
+    K.save('C:/Documents/wherever/my_kalamatchkas.csv')
