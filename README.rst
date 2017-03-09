@@ -14,7 +14,7 @@ In this example I create a diet and make a kalamatchkas based on an ingredient l
     
     my_meals = [('breakfast',400),('lunch',700),('dinner',700)]
     my_rules = [('protein_cal_%',.15,.30), ('fat_cal_%',.15,.25), ('carb_cal_%',.45,.60)]
-    my_diet = kalamatchkas.Diet("My Diet", meals=my_meals, macronutrient_rules=my_rules)
+    my_diet = kalamatchkas.Diet("My Diet", meals=my_meals, nutrient_rules_rules=my_rules)
 
     # Create your list of ingredients
     # You'll need a USDA API KEY (get one here:

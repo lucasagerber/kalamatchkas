@@ -1,5 +1,5 @@
 """
-kalamatchkas.usda
+kalamatchkas.Usda
 saba pilots
 description:  api for searching the usda database
 11.28.16
@@ -9,7 +9,7 @@ description:  api for searching the usda database
 import json
 import urllib.request
 import urllib.parse
-from collections import defaultdict
+from .Food import Food
 from .config import BASE_URL
 
 
@@ -48,7 +48,7 @@ class Usda(object):
         
     def food_report(self,
             ndbno,
-            type="b",
+            type="f", #(b)asic or (f)ull
             format="json"):
         """Look up the nutrition information on a food in the USDA food database using their API."""
         query_term_names = ["api_key","ndbno","type","format"]
@@ -62,88 +62,12 @@ class Usda(object):
             json_result = json.loads(url_result)["report"]
         
             food_info = json_result["food"]
-        
+            
             return Food(food_info)
         except urllib.error.HTTPError:
             print("ERROR:  Couldn't find this number: " + ndbno)
-    
-    
-
-class Food(object):
-
-    def __init__(self, query_result):
-        self.__ndbno = query_result["ndbno"]
-        self.__name = query_result["name"]
-        self.__gram = 100
-        
-        self.__nutrients = defaultdict(lambda: dict({'value':0}))
-        for nutrient in query_result["nutrients"]:
-            nutrient["value"] = float(nutrient["value"])
-            self.__nutrients[nutrient.pop("nutrient_id")] = nutrient
-            
-        self.__protein = self.__nutrients["203"]["value"]
-        self.__fat = self.__nutrients["204"]["value"]
-        self.__carb = self.__nutrients["205"]["value"]
-        self.__sugar = self.__nutrients["269"]["value"]
-        
-        print(self)
-
-
-    @property
-    def ndbno(self):
-        return self.__ndbno
-
-
-    @property
-    def name(self):
-        return self.__name
-
-
-    @property
-    def gram(self):
-        return self.__gram
-
-
-    @property
-    def nutrients(self):
-        return self.__nutrients
-
-
-    @property
-    def protein(self):
-        return self.__protein
-
-
-    @property
-    def fat(self):
-        return self.__fat
-
-
-    @property
-    def carb(self):
-        return self.__carb
-
-
-    @property
-    def sugar(self):
-        return self.__sugar
-        
-    
-    def re_gram(self, gram_amt):
-        gram_ratio = gram_amt / self.__gram
-        self.__gram = gram_amt
-        
-        for nutrient in self.__nutrients.keys():
-            self.__nutrients[nutrient]["value"] *= gram_ratio
-        
-        self.__protein *= gram_ratio
-        self.__fat *= gram_ratio
-        self.__carb *= gram_ratio
-        self.__sugar *= gram_ratio
-    
-    
-    def __str__(self):
-        return self.ndbno + ":  " + self.name
+        except urllib.error.URLError:
+            print("ERROR:  Well, it appears the USDA is down.")
 
     
     
