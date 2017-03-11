@@ -24,15 +24,10 @@ In this example I create a diet and make a kalamatchkas based on an ingredient l
     path = 'C:/Documents/wherever/ingredient_doron v16.xlsx'
     ingredients = kalamatchkas.FoodList(path, API_KEY)
 
-    # Put these in a kalamatchkas object ... and generate a day of kalamatchkas
+    # Put these in a kalamatchkas object
     
     K = kalamatchkas.Kalamatchkas(ingredients, my_diet)
-    K.day()
-
-    # Summarize the nutrient content of the kalamatchkas
     
-    K.summarize(print_out=True, day=False)
-
-    # Save the kalamatchkas out to a csv file
+    # Generate a day of kalamatchkas and save to directory
     
-    K.save('C:/Documents/whatever_folder')
+    K.day('C:/Documents/whatever_folder', days=1)

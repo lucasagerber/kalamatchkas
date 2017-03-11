@@ -1,7 +1,7 @@
 """
 kalamatchkas.config
 saba pilots
-description:  configuration file for kalamatchas program
+description:  configuration file for kalamatchkas program
 """
 
 

@@ -1,7 +1,7 @@
 """
 kalamatchkas.tools
 saba pilots
-description:  general tools file for kalamatchas program
+description:  general tools file for kalamatchkas program
 """
 
 

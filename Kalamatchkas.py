@@ -1,7 +1,7 @@
 """
-kalamatchkas.Kalmatchkas
+kalamatchkas.Kalamatchkas
 saba pilots
-description:  Kalamatchas object that takes diet parameters and food lists, and returns random recipes
+description:  Kalamatchkas object that takes diet parameters and food lists, and returns random recipes
 12.01.16
 """
 
@@ -59,18 +59,33 @@ class Kalamatchkas(object):
         return self.__food_group_fields
     
     
-    def day(self):
+    def day(self, directory, days=1):
         """Create a day of random recipes based on dietary rules and calorie requirements."""
-        self.create_recipe()
+        recipes = list()
         
-        # compile into various meals for day (...and handle cooking values?)
+        print(LINE_BEGIN + "Days to compile:  {}\n".format(days))
         
-        print(LINE_BEGIN + "Day of meals compiled!")
+        for i in range(1,days+1):
+            print(LINE_BEGIN + "Day {}".format(i))
+            self.create_recipe()
+            recipes.append(self.recipe.dataframe.copy())
+            
+            # compile into various meals for day (...and handle cooking values?)
+            
+            self.save(directory)
+            print(LINE_BEGIN + "Day {} compiled!\n".format(i))
+        
+        grocery_df = pd.concat(recipes).groupby("food").sum()[["serving","gram"]]
+        grocery_df.loc[:, "ounce"] = grocery_df["gram"] * 0.03527396
+        grocery_df.loc[:, "pound"] = grocery_df["gram"] * 0.00220462
+        
+        grocery_list = Recipe(grocery_df, "grocery_list")
+        grocery_list.save(directory, index=True)
 
 
     def create_recipe(self):
         """Create a random recipe based on dietary rules and calorie requirements."""    
-        print(LINE_BEGIN + "Compiling meal...")
+        print(LINE_BEGIN + "Compiling meals...")
         
         self.recipe = Recipe()
         
@@ -88,7 +103,7 @@ class Kalamatchkas(object):
         
         self.recipe.log(self.diet)
         if not self.recipe.test_rules(self.diet):
-            print(LINE_BEGIN + "Balancing the nutrient levels...")
+            print(LINE_BEGIN + "Balancing the nutrients...")
             original_recipe = Recipe(self.recipe.dataframe.copy())
             
             self.balance_nutrients()
@@ -100,7 +115,7 @@ class Kalamatchkas(object):
             print(LINE_BEGIN + "After balancing ...")
             self.recipe.summarize(print_out=True, fields=self.key_fields)
             
-        print(LINE_BEGIN + "Meal compiled...")
+        print(LINE_BEGIN + "Compiled...")
 
 
     def balance_nutrients(self, iter=0, ratio=1):
@@ -206,9 +221,9 @@ class Kalamatchkas(object):
         return self.recipe.summarize(print_out, self.key_fields, day)
     
     
-    def save(self, directory):
+    def save(self, directory, log_on=False):
         """Save the kalamatchkas recipe."""
-        self.recipe.save(directory)
+        self.recipe.save(directory, log_on)
     
     
 def compare_food_group(dataframe, food_row_food_group):
@@ -229,7 +244,7 @@ def compare_food_group(dataframe, food_row_food_group):
     return dataframe
     
     
-def main():
+def main(k_days=7):
     diet = Diet("Doron's Diet")
     food_list = FoodList(FOOD_PATH,
                         gram_amt=50,
@@ -245,9 +260,7 @@ def main():
                         api_key=API_KEY
     )
     K = Kalamatchkas(food_list, diet)
-    K.day()
-    K.summarize(print_out=True, day=False)
-    K.save(OUT_DIREC)
+    K.day(OUT_DIREC, days=k_days)
     
     
 if __name__ == "__main__":

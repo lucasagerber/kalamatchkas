@@ -16,12 +16,12 @@ from .tools import create_destination
 
 class Recipe(FoodListBase):
 
-    def __init__(self, dataframe=None):
+    def __init__(self, dataframe=None, name=None):
         """Load dataframe into recipe."""
         self.dataframe = dataframe
         self.log_by_sum = pd.DataFrame()
         self.log_by_food = pd.DataFrame(columns=['food'])
-        self.__name = self.write_name()
+        self.__name = self.write_name(name)
 
 
     @property
@@ -164,22 +164,27 @@ class Recipe(FoodListBase):
         return result_final
     
     
-    def save(self, output_directory):
+    def save(self, output_directory, log_on=False, index=False):
         """Save recipe and log of recipe to csv file."""
         dest, log_by_sum_dest, log_by_food_dest = create_destination(output_directory, self.name, 'csv')
         
         out_df = self.dataframe
-        out_df.to_csv(dest, index=False)
+        out_df.to_csv(dest, index=index)
         
-        out_log_by_sum = self.log_by_sum
-        out_log_by_sum.to_csv(log_by_sum_dest)
+        if log_on:
+            out_log_by_sum = self.log_by_sum
+            out_log_by_sum.to_csv(log_by_sum_dest)
         
-        out_log_by_food = self.log_by_food
-        out_log_by_food.to_csv(log_by_food_dest, index=False)
+            out_log_by_food = self.log_by_food
+            out_log_by_food.to_csv(log_by_food_dest, index=False)
     
     
-    def write_name(self):
-        return "recipe"
+    def write_name(self, name):
+        """Write out a name for the recipe.  Default is 'recipe'."""
+        if not name:
+            return "recipe"
+        else:
+            return name
     
     
     def write_instructions(self):

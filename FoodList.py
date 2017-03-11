@@ -29,11 +29,11 @@ class FoodList(FoodListBase):
             return
 
         if food_list_path and os.path.exists(food_list_path):
-            print(LINE_BEGIN + "Loading file... " + food_list_path)
+            print(LINE_BEGIN + "Loading file... " + food_list_path + "\n")
             self.dataframe = pd.read_csv(food_list_path)
             return
         
-        print(LINE_BEGIN + "Loading file... " + path)
+        print(LINE_BEGIN + "Loading file... " + path + "\n")
         
         self.dataframe = pd.read_excel(path)
         
@@ -55,7 +55,7 @@ class FoodList(FoodListBase):
                     food.re_gram(serving_size)
                     food_data['serving_size'].append(serving_size)
                 else:
-                    food.re_gram(serving_size)
+                    food.re_gram(gram_amt)
                     
                 food_data['food_id'].append(food.ndbno)
                 
