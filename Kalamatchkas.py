@@ -20,6 +20,8 @@ class Kalamatchkas(object):
 
     def __init__(self, food_list, diet):
         """Initalize kalamatchkas object."""
+        food_list.calculate_maxday(diet)
+        
         self.__food_list = food_list
         self.__diet = diet
         self.__recipe = Recipe()
@@ -67,6 +69,7 @@ class Kalamatchkas(object):
         
         for i in range(1,days+1):
             print(LINE_BEGIN + "Day {}".format(i))
+            
             self.create_recipe()
             recipes.append(self.recipe.dataframe.copy())
             
@@ -87,21 +90,19 @@ class Kalamatchkas(object):
         """Create a random recipe based on dietary rules and calorie requirements."""    
         print(LINE_BEGIN + "Compiling meals...")
         
+        self.food_list.re_gram(serving_size=True)
+        
         self.recipe = Recipe()
         
-        foodgroup_rule_mins = list()
-        for rule in self.diet.foodgroup_rules:
-            foodgroup_rule_mins.extend([rule[0]] * rule[1])
-        
-        for foodgroup in foodgroup_rule_mins:
-            new_food_df = self.food_list.select_food({'food_group':foodgroup})
-            self.recipe.add_food(new_food_df)
-        
-        while self.recipe.dataframe.empty or self.recipe.dataframe["total_cal"].sum() < self.diet.calories:
-            new_food_df = self.food_list.select_food()
-            self.recipe.add_food(new_food_df)
+        # Step 1:  fill up the recipe
+        self.fill_recipe()
         
         self.recipe.log(self.diet)
+        
+        print("Initial recipe test:")
+        self.recipe.test_maxday(print_results=True)
+        
+        # Step 2:  balance the nutrients
         if not self.recipe.test_rules(self.diet):
             print(LINE_BEGIN + "Balancing the nutrients...")
             original_recipe = Recipe(self.recipe.dataframe.copy())
@@ -114,12 +115,38 @@ class Kalamatchkas(object):
             original_recipe.summarize(print_out=True, fields=self.key_fields)
             print(LINE_BEGIN + "After balancing ...")
             self.recipe.summarize(print_out=True, fields=self.key_fields)
+        else:
+            self.check()
             
         print(LINE_BEGIN + "Compiled...")
 
 
+    def fill_recipe(self):
+        """Step 1:  Fill recipe up to calorie requirement by adding ingredients."""
+        
+        foodgroup_rule_mins = list()
+        for rule in self.diet.foodgroup_rules:
+            foodgroup_rule_mins.extend([rule[0]] * rule[1])
+        
+        food_list_maxday = FoodList(self.food_list.dataframe.copy())
+        food_list_maxday_selector = bool(True) & (
+            ( food_list_maxday.dataframe["gram"] <= food_list_maxday.dataframe["max_grams_day"] )
+            | ( food_list_maxday.dataframe["max_grams_day"] == -1 )
+        )
+        
+        for foodgroup in foodgroup_rule_mins:
+            new_food_df = self.food_list.select_food({'food_group':foodgroup}, conditional=food_list_maxday_selector)
+            self.recipe.add_food(new_food_df)
+            food_list_maxday.add_food(new_food_df)
+        
+        while self.recipe.dataframe.empty or self.recipe.dataframe["total_cal"].sum() < self.diet.calories:
+            new_food_df = self.food_list.select_food(conditional=food_list_maxday_selector)
+            self.recipe.add_food(new_food_df)
+            food_list_maxday.add_food(new_food_df)
+    
+    
     def balance_nutrients(self, iter=0, ratio=1):
-        """Balance the nutrient levels of a random recipe through replacement, according to dietary rules."""       
+        """Step 2:  Balance the nutrient levels of a random recipe through replacement, according to dietary rules."""       
         recipe_food_list = self.recipe.dataframe["food"].values
         food_df_dict = {food:self.compare_foods(food, ratio)  for food in recipe_food_list}
 
@@ -148,7 +175,7 @@ class Kalamatchkas(object):
             food_replace = food_replace_options.select_food()
             
             food_new_options = Recipe(food_df_dict[food_replace["food"]])
-            food_new_options.calculate_servings()
+            food_new_options.complete()
             food_new = food_new_options.select_food()
             
             self.recipe.del_food(food_replace)
@@ -169,18 +196,24 @@ class Kalamatchkas(object):
         
         recipe_sum, recipe_calories = self.recipe.summarize()
         
-        self.food_list.calculate_calories()
-        self.food_list.calculate_servings()
-        self.food_list.calculate_provitamin_a()
+        self.food_list.complete()
         
         food_comparison = Recipe(self.food_list.dataframe.copy())
         
-        food_row = self.food_list.dataframe.loc[self.food_list.dataframe["food"]==food, fields_needed].iloc[0] * ratio
+        food_row = self.food_list.dataframe.loc[self.food_list.dataframe["food"]==food, :] * ratio
         food_row_food_group = self.food_list.dataframe.loc[self.food_list.dataframe["food"]==food, ['food_group','serving']].iloc[0]
         
-        food_comparison.dataframe[fields_needed] = food_comparison.dataframe[fields_needed] - food_row + recipe_sum[fields_needed]
+        # calculate what key fields would be with replacement
+        food_comparison.dataframe[fields_needed] = food_comparison.dataframe[fields_needed] - food_row.iloc[0][fields_needed] + recipe_sum[fields_needed]
         food_comparison.calculate_calorie_percents()
 
+        # calculate what gram amount would be with replacement
+        food_comparison.dataframe = pd.merge(food_comparison.dataframe, self.recipe.dataframe[['food','gram']], on='food', how='left', suffixes=('','_recipe'))
+        food_comparison.dataframe = pd.merge(food_comparison.dataframe, food_row[['food','gram']], on='food', how='left', suffixes=('','_food'))
+        food_comparison.dataframe.loc[:, ['gram_recipe','gram_food']] = food_comparison.dataframe.loc[:, ['gram_recipe','gram_food']].fillna(0)
+        food_comparison.dataframe.loc[:, 'gram'] = food_comparison.dataframe.loc[:, 'gram'] + food_comparison.dataframe.loc[:, 'gram_recipe'] - food_comparison.dataframe.loc[:, 'gram_food']
+        
+        # calculate what food group totals would be with replacement
         for column in self.food_group_fields:
             if column not in recipe_sum.index:
                 recipe_sum[column] = 0
@@ -191,7 +224,13 @@ class Kalamatchkas(object):
         
         food_comparison.dataframe = food_comparison.dataframe.apply(compare_food_group, axis=1, food_row_food_group=food_row_food_group)
         
-        conditionals = bool(True) & ( food_comparison.dataframe["food"] != food )
+        # compute conditionals and return dataframe
+        conditionals = bool(True)
+        conditionals &= ( food_comparison.dataframe["food"] != food )
+        conditionals &= (
+            ( food_comparison.dataframe["gram"] <= food_comparison.dataframe["max_grams_day"] )
+            | ( food_comparison.dataframe["max_grams_day"] == -1 )
+        )
         
         rules = list()
         rules.extend(self.diet.nutrient_rules)

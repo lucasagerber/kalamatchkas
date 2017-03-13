@@ -98,7 +98,27 @@ class Recipe(FoodListBase):
         self.log_by_food.rename(columns={'serving':'serving'+str(col_len-1)}, inplace=True)
     
     
-    def test_rules(self, diet, print_results=False):
+    def test_maxday(self, print_results=False):
+        """Test whether a recipe follows all the food maximums."""
+        conditional = bool(True) & (
+            ( self.dataframe["gram"] > self.dataframe["max_grams_day"] )
+            & ( self.dataframe["max_grams_day"] != -1 )
+        )
+        
+        result_df = self.dataframe.loc[conditional , ["food","gram","max_grams_day"]]
+        result_final = result_df.empty
+        
+        if print_results:
+        
+            if not result_final:
+                print(result_df)
+                
+            print(LINE_BEGIN + "Max food day test found " + str(result_final))
+        
+        return result_final
+    
+    
+    def test_diet(self, diet, print_results=False):
         """Test whether a recipe fits all the dietary rules."""
         #print(LINE_BEGIN + "Testing the recipe follows rules...")
         
@@ -163,7 +183,14 @@ class Recipe(FoodListBase):
         
         return result_final
     
+
+    def test_rules(self, diet, print_results=False):
+        """Test whether a recipe fits all the rules of diet and max foods."""
+        result = self.test_diet(diet, print_results) & self.test_maxday(print_results)
+        
+        return result
     
+        
     def save(self, output_directory, log_on=False, index=False):
         """Save recipe and log of recipe to csv file."""
         dest, log_by_sum_dest, log_by_food_dest = create_destination(output_directory, self.name, 'csv')

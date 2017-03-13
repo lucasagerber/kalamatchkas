@@ -32,7 +32,7 @@ class FoodListBase(object):
             self.__dataframe = pd.DataFrame()
 
         
-    def select_food(self, search_dict={}):
+    def select_food(self, search_dict={}, conditional=None):
         """Select a food from the food list."""
         assert not self.dataframe.empty, LINE_BEGIN + "ERROR: food dataframe is empty"
         
@@ -40,10 +40,13 @@ class FoodListBase(object):
         
         select_dataframe = self.dataframe
         
+        if type(conditional) == pd.core.series.Series:
+            select_dataframe = self.dataframe[conditional]
+        
         if search_dict:
             conditionals = bool(True)
             for k, v in search_dict.items():
-                conditionals &= (self.dataframe[k] == v)
+                conditionals &= (select_dataframe[k] == v)
             
             select_dataframe = self.dataframe[conditionals]
         
@@ -66,9 +69,7 @@ class FoodListBase(object):
         
         self.dataframe = updated_df
         
-        self.calculate_calories()
-        self.calculate_servings()
-        self.calculate_provitamin_a()
+        self.complete()
         
         #print(LINE_BEGIN + "Added food:  ", food_df["food"])
         
@@ -86,9 +87,7 @@ class FoodListBase(object):
         
         self.dataframe = updated_df
         
-        self.calculate_calories()
-        self.calculate_servings()
-        self.calculate_provitamin_a()
+        self.complete()
             
         #print(LINE_BEGIN + "Deleted food:  ", food_df["food"])
 
@@ -118,7 +117,12 @@ class FoodListBase(object):
     def calculate_provitamin_a(self):
         """Calculate number of servings of each food in the food list."""
         self.dataframe.loc[:, 'provitamin_a'] = (self.dataframe['carotene_beta'] / 12) + (self.dataframe['carotene_alpha'] / 24) + (self.dataframe['cryptoxanthin_beta'] / 24)
-        
+    
+    
+    def complete(self):
+        self.calculate_calories()
+        self.calculate_servings()
+        self.calculate_provitamin_a()
         
     def save(self, output_file):
         """Save food list to csv file."""

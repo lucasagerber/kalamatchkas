@@ -119,11 +119,15 @@ class FoodList(FoodListBase):
         for key in usda_nutrient_name_dict.keys():
             self.dataframe.loc[:, key] *= self.dataframe['gram_ratio']
         
-        self.calculate_calories()
-        self.calculate_servings()
-        self.calculate_provitamin_a()
+        self.complete()
     
-        
+    
+    def calculate_maxday(self, diet):
+        """Calculate daily maximum food amounts based on meal amounts and number of days."""
+        food_list_selector = (self.dataframe['max_grams_meal'] != -1) & (self.dataframe['max_grams_day'] == -1)
+        self.dataframe.loc[food_list_selector, 'max_grams_day'] = self.dataframe['max_grams_meal'] * len(diet.meals)
+    
+    
     def get_info(self, columns):
         """Gather and return a unique list of NDB_NOs from dataframe."""
         self.dataframe[columns['ndb_nos']] = self.dataframe[columns['ndb_nos']].apply(str).apply(str.strip)
