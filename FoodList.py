@@ -14,6 +14,7 @@ from .Usda import Usda
 from .UsdaDicts import usda_nutrient_name_dict
 from .Food import Food
 from .config import LINE_BEGIN
+from .tools import k_print
 
 
 class FoodList(FoodListBase):
@@ -29,11 +30,11 @@ class FoodList(FoodListBase):
             return
 
         if food_list_path and os.path.exists(food_list_path):
-            print(LINE_BEGIN + "Loading file... " + food_list_path + "\n")
+            k_print("Loading file... " + food_list_path + "\n")
             self.dataframe = pd.read_csv(food_list_path)
             return
         
-        print(LINE_BEGIN + "Loading file... " + path + "\n")
+        k_print("Loading file... " + path + "\n")
         
         self.dataframe = pd.read_excel(path)
         
@@ -86,7 +87,6 @@ class FoodList(FoodListBase):
             
             if food_list_path:
                 self.save(food_list_path)
-            #print(self.dataframe)
     
     
     def re_gram(self, gram_amt=None, gram_pct=None, serving_size=False, n_serving=False, verbose=False):
@@ -96,23 +96,23 @@ class FoodList(FoodListBase):
             assert 'serving' in self.dataframe.columns, LINE_BEGIN + "ERROR: this dataframe has no serving numbers specified"
             assert 'serving_size' in self.dataframe.columns, LINE_BEGIN + "ERROR: this dataframe has no serving sizes specified"
             if verbose:
-                print(LINE_BEGIN + "Changing food list to number of servings")
+                k_print("Changing food list to number of servings")
             self.dataframe.loc[:, 'gram_ratio'] = self.dataframe['serving_size'] * self.dataframe['serving'] / self.dataframe['gram']
             self.dataframe.loc[:, 'gram'] = self.dataframe['serving_size'] * self.dataframe['serving']
         elif serving_size:
             assert 'serving_size' in self.dataframe.columns, LINE_BEGIN + "ERROR: this dataframe has no serving sizes specified"
             if verbose:
-                print(LINE_BEGIN + "Changing food list to serving sizes")
+                k_print("Changing food list to serving sizes")
             self.dataframe.loc[:, 'gram_ratio'] = self.dataframe['serving_size'] / self.dataframe['gram']
             self.dataframe.loc[:, 'gram'] = self.dataframe['serving_size']   
         elif gram_amt:
             if verbose:
-                print(LINE_BEGIN + "Changing food list to {0} grams".format(gram_amt))
+                k_print("Changing food list to {0} grams".format(gram_amt))
             self.dataframe.loc[:, 'gram_ratio'] = gram_amt / self.dataframe['gram']
             self.dataframe.loc[:, 'gram'] = gram_amt
         elif gram_pct:
             if verbose:
-                print(LINE_BEGIN + "Changing food list to {0}% of current grams".format(gram_pct*100))
+                k_print("Changing food list to {0}% of current grams".format(gram_pct*100))
             self.dataframe.loc[:, 'gram_ratio'] = gram_pct #this line gives the pandas indexing warning...
             self.dataframe.loc[:, 'gram'] *= self.dataframe['gram_ratio']
         

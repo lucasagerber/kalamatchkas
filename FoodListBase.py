@@ -71,8 +71,6 @@ class FoodListBase(object):
         
         self.complete()
         
-        #print(LINE_BEGIN + "Added food:  ", food_df["food"])
-        
         
     def del_food(self, food_df):
         """Delete chosen food from the food list."""
@@ -88,8 +86,6 @@ class FoodListBase(object):
         self.dataframe = updated_df
         
         self.complete()
-            
-        #print(LINE_BEGIN + "Deleted food:  ", food_df["food"])
 
         
     def calculate_calories(self):
@@ -123,7 +119,8 @@ class FoodListBase(object):
         self.calculate_calories()
         self.calculate_servings()
         self.calculate_provitamin_a()
-        
+    
+    
     def save(self, output_file):
         """Save food list to csv file."""
         out_df = self.dataframe

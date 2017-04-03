@@ -11,7 +11,7 @@ import pandas as pd
 from .FoodListBase import FoodListBase
 from .FoodList import FoodList
 from .config import LINE_BEGIN, BASE_FIELDS
-from .tools import create_destination
+from .tools import create_destination, k_print
 
 
 class Recipe(FoodListBase):
@@ -55,6 +55,14 @@ class Recipe(FoodListBase):
             self.__log_by_food = value
         else:
             self.__log_by_food = pd.DataFrame(columns=['food'])
+    
+    
+    @property
+    def grocery_list(self):
+        grocery_df = self.dataframe.groupby("food").sum()[["serving","gram"]]
+        grocery_df.loc[:, "ounce"] = grocery_df["gram"] * 0.03527396
+        grocery_df.loc[:, "pound"] = grocery_df["gram"] * 0.00220462
+        return grocery_df
     
     
     def summarize(self, print_out=False, fields=None, day=False):
@@ -113,15 +121,13 @@ class Recipe(FoodListBase):
             if not result_final:
                 print(result_df)
                 
-            print(LINE_BEGIN + "Max food day test found " + str(result_final))
+            k_print("Max food day test found " + str(result_final))
         
         return result_final
     
     
     def test_diet(self, diet, print_results=False):
-        """Test whether a recipe fits all the dietary rules."""
-        #print(LINE_BEGIN + "Testing the recipe follows rules...")
-        
+        """Test whether a recipe fits all the dietary rules."""        
         recipe_sum, calories = self.summarize()
         
         conditionals = bool(True)
@@ -146,21 +152,19 @@ class Recipe(FoodListBase):
             key_fields = BASE_FIELDS
             key_fields.extend([rule[0] for rule in diet.nutrient_rules  if rule[0] not in BASE_FIELDS])
             
-            self.summarize(print_out=True, fields=key_fields)
+            #self.summarize(print_out=True, fields=key_fields)
             
             if not conditionals:
                 for k, v in conditionals_dict.items():
-                    print("{0}{1} : {2}".format(LINE_BEGIN, k, v))
+                    k_print("{0} : {1}".format(k, v))
             
-            print(LINE_BEGIN + "Rules test found " + str(conditionals))
+            k_print("Rules test found " + str(conditionals))
         
         return conditionals
         
         
     def test_foodlist(self, food_list, print_results=False):
-        """Test whether a recipe fits all the dietary rules."""
-        #print(LINE_BEGIN + "Testing the recipe compared to food list...")
-        
+        """Test whether a recipe fits all the dietary rules."""        
         food_list_df_copy = food_list.dataframe.drop('serving', axis=1)
         food_list_copy = FoodList(pd.merge(food_list_df_copy, self.dataframe[['food','serving']], how='left', on='food'))
         food_list_copy.dataframe.loc[:, 'serving'] = food_list_copy.dataframe['serving'].fillna(0)
@@ -179,7 +183,7 @@ class Recipe(FoodListBase):
             if not result_final:
                 print(result_cols)
                 
-            print(LINE_BEGIN + "Food list test found " + str(result_final))
+            k_print("Food list test found " + str(result_final))
         
         return result_final
     
@@ -189,18 +193,28 @@ class Recipe(FoodListBase):
         result = self.test_diet(diet, print_results) & self.test_maxday(print_results)
         
         return result
+
+
+    def test(self, diet, food_list, print_results=True):
+        """Test that a recipe fits all the rules and is correctly constituted from the food list."""
+        self.test_rules(diet, print_results=print_results)
+        self.test_foodlist(food_list, print_results=print_results)
     
-        
-    def save(self, output_directory, log_on=False, index=False):
+    
+    def save(self, output_directory, detail=True, log_on=False):
         """Save recipe and log of recipe to csv file."""
-        dest, log_by_sum_dest, log_by_food_dest = create_destination(output_directory, self.name, 'csv')
+        dest, detail_dest, log_by_sum_dest, log_by_food_dest = create_destination(output_directory, self.name, 'csv')
         
-        out_df = self.dataframe
-        out_df.to_csv(dest, index=index)
+        out_grocery_df = self.grocery_list
+        out_grocery_df.to_csv(dest, index=True)
+        
+        if detail:
+            out_df = self.dataframe
+            out_df.to_csv(detail_dest, index=False)
         
         if log_on:
             out_log_by_sum = self.log_by_sum
-            out_log_by_sum.to_csv(log_by_sum_dest)
+            out_log_by_sum.to_csv(log_by_sum_dest, index=True)
         
             out_log_by_food = self.log_by_food
             out_log_by_food.to_csv(log_by_food_dest, index=False)

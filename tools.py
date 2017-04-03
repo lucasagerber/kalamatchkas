@@ -6,11 +6,13 @@ description:  general tools file for kalamatchkas program
 
 
 import os
+from .config import LINE_BEGIN
 
 
-def verbose_print(verbose, statement):
+def k_print(statement, verbose=True):
+    """Prints with LINE_BEGIN if option is on."""
     if verbose:
-        print(statement)
+        print(LINE_BEGIN + statement)
 
 
 def num_gen():
@@ -20,19 +22,19 @@ def num_gen():
         i += 1
 
 
-def create_destination(result_path, output_name, output_type):
-    destination = result_path + '/' + output_name + '.' + output_type
-    log_by_sum_destination = result_path + '/' + output_name + '_log_by_sum' + '.' + output_type
-    log_by_food_destination = result_path + '/' + output_name + '_log_by_food' + '.' + output_type
+def create_destination(result_path, output_name, output_type, destination_names=["", "_detail", "_log_by_sum","_log_by_food"]):
+    """Creates new destination file names for a recipe."""
+    full_name = result_path + '/' + output_name
+    i = (i for i in num_gen())
     
-    i = (i+1 for i in num_gen())
-    while os.path.exists(destination):
+    number = str(next(i))
+    destination_list = ["{0}{1}{2}.{3}".format(full_name, number, name, output_type) for name in destination_names]
+    
+    while os.path.exists(destination_list[0]):
         number = str(next(i))
-        destination = result_path + '/' + output_name + number + '.' + output_type
-        log_by_sum_destination = result_path + '/' + output_name + number + '_log_by_sum' + '.' + output_type
-        log_by_food_destination = result_path + '/' + output_name + number + '_log_by_food' + '.' + output_type
+        destination_list = ["{0}{1}{2}.{3}".format(full_name, number, name, output_type) for name in destination_names]
         
-    return destination, log_by_sum_destination, log_by_food_destination
+    return destination_list
 
 
 def main():

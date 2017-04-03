@@ -13,6 +13,7 @@ import pandas as pd
 from .FoodList import FoodList
 from .Recipe import Recipe
 from .Diet import Diet
+from .tools import k_print
 from .config import FOOD_PATH, OUT_DIREC, FOOD_LIST, LINE_BEGIN, BASE_FIELDS, API_KEY
 
 
@@ -24,7 +25,6 @@ class Kalamatchkas(object):
         
         self.__food_list = food_list
         self.__diet = diet
-        self.__recipe = Recipe()
         self.__key_fields = BASE_FIELDS
         self.__key_fields.extend([rule[0] for rule in self.diet.nutrient_rules  if rule[0] not in BASE_FIELDS])
         self.__food_group_fields = [rule[0] for rule in self.diet.foodgroup_rules]
@@ -39,89 +39,74 @@ class Kalamatchkas(object):
     def diet(self):
         return self.__diet
     
-
-    @property
-    def recipe(self):
-        return self.__recipe
-
-    
-    @recipe.setter
-    def recipe(self, value):
-        assert type(value) == Recipe, LINE_BEGIN + "ERROR: non recipe assigned to recipe property"
-        self.__recipe = value
-    
     
     @property
     def key_fields(self):
         return self.__key_fields
-        
-        
+    
+    
     @property
     def food_group_fields(self):
         return self.__food_group_fields
     
     
-    def day(self, directory, days=1):
+    def day(self, directory, days=1, grocery_list=True):
         """Create a day of random recipes based on dietary rules and calorie requirements."""
         recipes = list()
         
-        print(LINE_BEGIN + "Days to compile:  {}\n".format(days))
+        k_print("Days to compile:  {}\n".format(days))
         
         for i in range(1,days+1):
-            print(LINE_BEGIN + "Day {}".format(i))
+            k_print("Day {}".format(i))
             
-            self.create_recipe()
-            recipes.append(self.recipe.dataframe.copy())
+            recipe = self.create_recipe()
+            recipes.append(recipe.dataframe)
             
             # compile into various meals for day (...and handle cooking values?)
             
-            self.save(directory)
-            print(LINE_BEGIN + "Day {} compiled!\n".format(i))
+            recipe.save(directory)
+            k_print("Day {} compiled!\n".format(i))
         
-        grocery_df = pd.concat(recipes).groupby("food").sum()[["serving","gram"]]
-        grocery_df.loc[:, "ounce"] = grocery_df["gram"] * 0.03527396
-        grocery_df.loc[:, "pound"] = grocery_df["gram"] * 0.00220462
-        
-        grocery_list = Recipe(grocery_df, "grocery_list")
-        grocery_list.save(directory, index=True)
+        if grocery_list:
+            grocery_list = Recipe(pd.concat(recipes), "grocery_list")
+            grocery_list.save(directory, detail=False)
 
 
     def create_recipe(self):
         """Create a random recipe based on dietary rules and calorie requirements."""    
-        print(LINE_BEGIN + "Compiling meals...")
+        k_print("Compiling ...")
         
         self.food_list.re_gram(serving_size=True)
         
-        self.recipe = Recipe()
+        recipe = Recipe()
         
         # Step 1:  fill up the recipe
-        self.fill_recipe()
         
-        self.recipe.log(self.diet)
+        recipe = self.fill_recipe(recipe)
         
-        print("Initial recipe test:")
-        self.recipe.test_maxday(print_results=True)
+        recipe.log(self.diet)
         
         # Step 2:  balance the nutrients
-        if not self.recipe.test_rules(self.diet):
-            print(LINE_BEGIN + "Balancing the nutrients...")
-            original_recipe = Recipe(self.recipe.dataframe.copy())
+        
+        if not recipe.test_rules(self.diet):
+            k_print("Balancing the nutrients...")
+            original_recipe, original_cal = recipe.summarize(fields=self.key_fields)
             
-            self.balance_nutrients()
+            recipe = self.balance_nutrients(recipe)
             
-            self.check()
-            
-            print(LINE_BEGIN + "Before balancing ...")
-            original_recipe.summarize(print_out=True, fields=self.key_fields)
-            print(LINE_BEGIN + "After balancing ...")
-            self.recipe.summarize(print_out=True, fields=self.key_fields)
-        else:
-            self.check()
-            
-        print(LINE_BEGIN + "Compiled...")
+            k_print("Before balancing ...")
+            print(original_recipe)
+            k_print("After balancing ...")
+            recipe.summarize(print_out=True, fields=self.key_fields)
+        
+        recipe.test(self.diet, self.food_list)
+        k_print("Compiled...")
+        
+        return recipe
 
 
-    def fill_recipe(self):
+
+    def fill_recipe(self, recipe):
         """Step 1:  Fill recipe up to calorie requirement by adding ingredients."""
         
         foodgroup_rule_mins = list()
@@ -136,65 +121,67 @@ class Kalamatchkas(object):
         
         for foodgroup in foodgroup_rule_mins:
             new_food_df = self.food_list.select_food({'food_group':foodgroup}, conditional=food_list_maxday_selector)
-            self.recipe.add_food(new_food_df)
+            recipe.add_food(new_food_df)
             food_list_maxday.add_food(new_food_df)
         
-        while self.recipe.dataframe.empty or self.recipe.dataframe["total_cal"].sum() < self.diet.calories:
+        while recipe.dataframe.empty or recipe.dataframe["total_cal"].sum() < self.diet.calories:
             new_food_df = self.food_list.select_food(conditional=food_list_maxday_selector)
-            self.recipe.add_food(new_food_df)
+            recipe.add_food(new_food_df)
             food_list_maxday.add_food(new_food_df)
+            
+        return recipe
     
     
-    def balance_nutrients(self, iter=0, ratio=1):
+    def balance_nutrients(self, recipe, iter=0, ratio=1):
         """Step 2:  Balance the nutrient levels of a random recipe through replacement, according to dietary rules."""       
-        recipe_food_list = self.recipe.dataframe["food"].values
-        food_df_dict = {food:self.compare_foods(food, ratio)  for food in recipe_food_list}
+        recipe_food_list = recipe.dataframe["food"].values
+        food_df_dict = {food:self.compare_foods(recipe, food, ratio)  for food in recipe_food_list}
 
-        self.recipe.dataframe.loc[:, "compare_df"] = self.recipe.dataframe['food'].apply(lambda x: not food_df_dict[x].empty)
-        recipe_df_select = self.recipe.dataframe[self.recipe.dataframe["compare_df"]]
-        self.recipe.dataframe.drop("compare_df", axis=1, inplace=True)
+        recipe.dataframe.loc[:, "compare_df"] = recipe.dataframe['food'].apply(lambda x: not food_df_dict[x].empty)
+        recipe_df_select = recipe.dataframe[recipe.dataframe["compare_df"]]
+        recipe.dataframe.drop("compare_df", axis=1, inplace=True)
         
         if recipe_df_select.empty:
             if iter < 4:
                 self.food_list.re_gram(gram_pct=.5, verbose=True)
-                self.balance_nutrients(iter+1)
+                recipe = self.balance_nutrients(recipe, iter+1)
             elif iter == 4:
                 self.food_list.re_gram(serving_size=True, verbose=True)
-                print(LINE_BEGIN + "Ratio = 0.01")
-                self.balance_nutrients(iter+1, ratio=.01)
+                k_print("Ratio = 0.01")
+                recipe = self.balance_nutrients(recipe, iter+1, ratio=.01)
             elif iter == 5 and ratio <= 200:
-                print(LINE_BEGIN + "Ratio = " + str(ratio*2))
-                self.balance_nutrients(iter, ratio*2)
+                k_print("Ratio = " + str(ratio*2))
+                recipe = self.balance_nutrients(recipe, iter, ratio*2)
             else:
-                #self.balance_nutrients(iter=0)
-                print(LINE_BEGIN + "Sorry, there are no options for this recipe")
+                k_print("Sorry, there are no options for this recipe")
         else:
             food_list_copy = self.food_list.dataframe.copy()
             food_replace_options = FoodList(food_list_copy[self.food_list.dataframe["food"].isin(recipe_df_select["food"].values)])
-            food_replace_options.re_gram(gram_pct=ratio)
+            food_replace_options.re_gram(gram_pct=ratio)    # regram only if the ratio doesn't equal 1?
             food_replace = food_replace_options.select_food()
             
             food_new_options = Recipe(food_df_dict[food_replace["food"]])
-            food_new_options.complete()
+            food_new_options.complete()    # is this necessary?
             food_new = food_new_options.select_food()
             
-            self.recipe.del_food(food_replace)
-            self.recipe.add_food(food_new)
+            recipe.del_food(food_replace)
+            recipe.add_food(food_new)
             
-            print("{0}{1} serving(s) of {2} replaced with {3} serving(s) of {4}".format(LINE_BEGIN, food_replace["serving"], food_replace["food"], food_new["serving"], food_new["food"]))
+            k_print("{0} serving(s) of {1} replaced with {2} serving(s) of {3}".format(food_replace["serving"], food_replace["food"], food_new["serving"], food_new["food"]))
             
-            self.recipe.log(self.diet, replacement=(food_replace, food_new))
-            if not self.recipe.test_rules(self.diet):
-                self.balance_nutrients(iter, ratio)
+            recipe.log(self.diet, replacement=(food_replace, food_new))
+            
+            if not recipe.test_rules(self.diet):
+                recipe = self.balance_nutrients(recipe, iter, ratio)
+            
+        return recipe
     
 
-    def compare_foods(self, food, ratio=1):
+    def compare_foods(self, recipe, food, ratio=1):
         """Compare all possible foods to see if any will move closer to goals, based on a recipe and chosen food to replace."""
-        #print(LINE_BEGIN + "Comparing " + old_food + " to all possible foods...")
-        
         fields_needed = [rule.replace('_%', '') for rule in self.key_fields]
         
-        recipe_sum, recipe_calories = self.recipe.summarize()
+        recipe_sum, recipe_calories = recipe.summarize()
         
         self.food_list.complete()
         
@@ -208,7 +195,7 @@ class Kalamatchkas(object):
         food_comparison.calculate_calorie_percents()
 
         # calculate what gram amount would be with replacement
-        food_comparison.dataframe = pd.merge(food_comparison.dataframe, self.recipe.dataframe[['food','gram']], on='food', how='left', suffixes=('','_recipe'))
+        food_comparison.dataframe = pd.merge(food_comparison.dataframe, recipe.dataframe[['food','gram']], on='food', how='left', suffixes=('','_recipe'))
         food_comparison.dataframe = pd.merge(food_comparison.dataframe, food_row[['food','gram']], on='food', how='left', suffixes=('','_food'))
         food_comparison.dataframe.loc[:, ['gram_recipe','gram_food']] = food_comparison.dataframe.loc[:, ['gram_recipe','gram_food']].fillna(0)
         food_comparison.dataframe.loc[:, 'gram'] = food_comparison.dataframe.loc[:, 'gram'] + food_comparison.dataframe.loc[:, 'gram_recipe'] - food_comparison.dataframe.loc[:, 'gram_food']
@@ -248,21 +235,6 @@ class Kalamatchkas(object):
             )
 
         return self.food_list.dataframe.loc[conditionals, :]
-
-        
-    def check(self):
-        self.recipe.test_rules(self.diet, print_results=True)
-        self.recipe.test_foodlist(self.food_list, print_results=True)
-    
-
-    def summarize(self, print_out=False, day=False):
-        """Summarize the kalamatchkas recipe."""       
-        return self.recipe.summarize(print_out, self.key_fields, day)
-    
-    
-    def save(self, directory, log_on=False):
-        """Save the kalamatchkas recipe."""
-        self.recipe.save(directory, log_on)
     
     
 def compare_food_group(dataframe, food_row_food_group):
