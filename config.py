@@ -24,7 +24,7 @@ BASE_FIELDS = ["protein_cal_%","carb_cal_%","fat_cal_%","total_cal"]
 FIELDS_DONT_UPDATE = ['food_id','serving_size','max_grams_meal','max_grams_day']
 
 # api key for searching usda database
-API_KEY = "Gb3vhyvcHwFhZNtbD2fqWc3oeNdwYA22qqND1fyU" #Doron: "xHAJ4pkp29k08lmA0vW554IxhtoR1IRekdCkPpLL"
+API_KEY = ""
 
 # debug mode
 DEBUG = False
