@@ -6,7 +6,7 @@ description:  FoodList object, dataframe of potential ingredients with nutrition
 """
 
 
-import random, os
+import os
 import pandas as pd
 from collections import defaultdict
 from .FoodListBase import FoodListBase
@@ -27,11 +27,13 @@ class FoodList(FoodListBase):
             assert os.path.exists(path), LINE_BEGIN + "ERROR: unable to find food file in " + path
         elif type(path) in (pd.core.frame.DataFrame, pd.core.series.Series):
             self.dataframe = path
+            self.dataframe = self.dataframe.sort_values('food').reset_index(drop=True)
             return
 
         if food_list_path and os.path.exists(food_list_path):
             k_print("Loading file... " + food_list_path + "\n")
             self.dataframe = pd.read_csv(food_list_path)
+            self.dataframe = self.dataframe.sort_values('food').reset_index(drop=True)
             return
         
         k_print("Loading file... " + path + "\n")
@@ -84,6 +86,7 @@ class FoodList(FoodListBase):
                 
             self.dataframe = pd.DataFrame(food_data)
             self.dataframe.loc[:, ('max_grams_meal','max_grams_day')] = self.dataframe[['max_grams_meal','max_grams_day']].fillna(-1)
+            self.dataframe = self.dataframe.sort_values('food').reset_index(drop=True)
             
             if food_list_path:
                 self.save(food_list_path)
@@ -107,12 +110,12 @@ class FoodList(FoodListBase):
             self.dataframe.loc[:, 'gram'] = self.dataframe['serving_size']   
         elif gram_amt:
             if verbose:
-                k_print("Changing food list to {0} grams".format(gram_amt))
+                k_print("Changing food list to {} grams".format(gram_amt))
             self.dataframe.loc[:, 'gram_ratio'] = gram_amt / self.dataframe['gram']
             self.dataframe.loc[:, 'gram'] = gram_amt
         elif gram_pct:
             if verbose:
-                k_print("Changing food list to {0}% of current grams".format(gram_pct*100))
+                k_print("Changing food list to {}% of current grams".format(gram_pct*100))
             self.dataframe.loc[:, 'gram_ratio'] = gram_pct #this line gives the pandas indexing warning...
             self.dataframe.loc[:, 'gram'] *= self.dataframe['gram_ratio']
         
@@ -138,6 +141,11 @@ class FoodList(FoodListBase):
         
         return df_ndbnos_only[list(columns.keys())]
 
+        
+    def copy(self):
+        """Return a copy of a foodlist."""
+        return FoodList(self.dataframe.copy())
+        
     
 def main():
     pass

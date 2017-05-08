@@ -10,7 +10,10 @@ import json
 import urllib.request
 import urllib.parse
 from .Food import Food
-from .config import BASE_URL
+
+
+# base url for searching usda database
+BASE_URL = "http://api.nal.usda.gov/ndb/"
 
 
 class Usda(object):

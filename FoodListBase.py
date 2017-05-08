@@ -6,9 +6,10 @@ description:  FoodListBase object, dataframe of ingredients with nutritional inf
 """
 
 
-import random, os
+import random
 import pandas as pd
 from .config import LINE_BEGIN, FIELDS_DONT_UPDATE
+from .tools import order_columns
 
 
 class FoodListBase(object):
@@ -32,25 +33,36 @@ class FoodListBase(object):
             self.__dataframe = pd.DataFrame()
 
         
-    def select_food(self, search_dict={}, conditional=None):
+    def select_food(self, conditional_dict={}, conditional=None, priority_dict={}):
         """Select a food from the food list."""
         assert not self.dataframe.empty, LINE_BEGIN + "ERROR: food dataframe is empty"
-        
-        #random.sample(list(self.dataframe.index.values), number) would need to modify for multiple...instead of line below
-        
+                
         select_dataframe = self.dataframe
         
+        # select on any conditionals
         if type(conditional) == pd.core.series.Series:
-            select_dataframe = self.dataframe[conditional]
-        
-        if search_dict:
+            select_dataframe = select_dataframe[conditional]
+
+        # select on any conditional dict
+        if conditional_dict:
             conditionals = bool(True)
-            for k, v in search_dict.items():
+            for k, v in conditional_dict.items():
                 conditionals &= (select_dataframe[k] == v)
             
-            select_dataframe = self.dataframe[conditionals]
+            select_dataframe = select_dataframe[conditionals]
+
+        # prioritize from priority dict
+        if priority_dict:
+            priority = bool(True)
+            for k, v in priority_dict.items():
+                priority &= (select_dataframe[k].isin(v))
+            
+            priority_dataframe = select_dataframe[priority]
+            
+            if not priority_dataframe.empty:
+                select_dataframe = priority_dataframe
         
-        rand_index = random.choice(list(select_dataframe.index.values))
+        rand_index = random.choice(select_dataframe.index.values.tolist())
         food_df = self.dataframe.ix[rand_index]
         
         return food_df
@@ -67,7 +79,7 @@ class FoodListBase(object):
         else:
             updated_df = self.dataframe.append(food_df).reset_index(drop=True)
         
-        self.dataframe = updated_df
+        self.dataframe = updated_df.sort_values('food').reset_index(drop=True)
         
         self.complete()
         
@@ -81,9 +93,9 @@ class FoodListBase(object):
         fields_to_update = [field for field in updated_df.columns if updated_df[field].dtype == 'float64' and field not in FIELDS_DONT_UPDATE]
         updated_df.loc[updated_df["food"]==food_df["food"], fields_to_update] -= food_df[fields_to_update]
         
-        updated_df = updated_df[updated_df["gram"] > 0].reset_index(drop=True)
+        updated_df = updated_df[updated_df["gram"] > 0]
         
-        self.dataframe = updated_df
+        self.dataframe = updated_df.sort_values('food').reset_index(drop=True)
         
         self.complete()
 
@@ -116,6 +128,7 @@ class FoodListBase(object):
     
     
     def complete(self):
+        """Calculate calories, servings, and provitamin A."""
         self.calculate_calories()
         self.calculate_servings()
         self.calculate_provitamin_a()
@@ -123,7 +136,8 @@ class FoodListBase(object):
     
     def save(self, output_file):
         """Save food list to csv file."""
-        out_df = self.dataframe
+        columns = order_columns(self.dataframe.columns.tolist())
+        out_df = self.dataframe[columns]
         out_df.to_csv(output_file, index=False)
 
     

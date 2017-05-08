@@ -6,12 +6,11 @@ description:  Recipe object, dataframe of a recipe
 """
 
 
-import random, os
 import pandas as pd
+import numpy as np
 from .FoodListBase import FoodListBase
-from .FoodList import FoodList
 from .config import LINE_BEGIN, BASE_FIELDS
-from .tools import create_destination, k_print
+from .tools import create_destination, test_print, order_columns
 
 
 class Recipe(FoodListBase):
@@ -19,15 +18,39 @@ class Recipe(FoodListBase):
     def __init__(self, dataframe=None, name=None):
         """Load dataframe into recipe."""
         self.dataframe = dataframe
+        self.log_by_version = list()
+        self.log_by_grocery_list = list()
         self.log_by_sum = pd.DataFrame()
         self.log_by_food = pd.DataFrame(columns=['food'])
-        self.__name = self.write_name(name)
+        self.write_name(name)
 
 
     @property
     def name(self):
         return self.__name
+        
+        
+    @property
+    def log_by_version(self):
+        return self.__log_by_version
     
+    
+    @log_by_version.setter
+    def log_by_version(self, value):
+        assert (type(value) == list), LINE_BEGIN + "ERROR: non list assigned to log_by_version property"
+        self.__log_by_version = value
+
+
+    @property
+    def log_by_grocery_list(self):
+        return self.__log_by_grocery_list
+    
+    
+    @log_by_grocery_list.setter
+    def log_by_grocery_list(self, value):
+        assert (type(value) == list), LINE_BEGIN + "ERROR: non list assigned to log_by_grocery_list property"
+        self.__log_by_grocery_list = value
+        
     
     @property
     def log_by_sum(self):
@@ -88,6 +111,10 @@ class Recipe(FoodListBase):
     
     def log(self, diet, replacement=None):
         """Update the recipe logs."""
+        
+        self.log_by_version.append(self.dataframe)
+        self.log_by_grocery_list.append(self.dataframe.groupby("food").sum()[["serving","gram"]])
+        
         key_fields = BASE_FIELDS
         key_fields.extend([rule[0] for rule in diet.nutrient_rules  if rule[0] not in BASE_FIELDS])
         
@@ -116,12 +143,7 @@ class Recipe(FoodListBase):
         result_df = self.dataframe.loc[conditional , ["food","gram","max_grams_day"]]
         result_final = result_df.empty
         
-        if print_results:
-        
-            if not result_final:
-                print(result_df)
-                
-            k_print("Max food day test found " + str(result_final))
+        test_print(result_final, result_df, "Max gram/day", verbose=print_results)
         
         return result_final
     
@@ -146,44 +168,33 @@ class Recipe(FoodListBase):
             boolean_rule = (rule[1] <= recipe_sum[rule[0]] <= rule[2])
             conditionals_dict[rule[0]] = boolean_rule
             conditionals &= boolean_rule
-            
-        if print_results:
         
-            key_fields = BASE_FIELDS
-            key_fields.extend([rule[0] for rule in diet.nutrient_rules  if rule[0] not in BASE_FIELDS])
-            
-            #self.summarize(print_out=True, fields=key_fields)
-            
-            if not conditionals:
-                for k, v in conditionals_dict.items():
-                    k_print("{0} : {1}".format(k, v))
-            
-            k_print("Rules test found " + str(conditionals))
+        test_print(conditionals, conditionals_dict, "Key field rules", verbose=print_results)
         
         return conditionals
         
         
     def test_foodlist(self, food_list, print_results=False):
-        """Test whether a recipe fits all the dietary rules."""        
-        food_list_df_copy = food_list.dataframe.drop('serving', axis=1)
-        food_list_copy = FoodList(pd.merge(food_list_df_copy, self.dataframe[['food','serving']], how='left', on='food'))
-        food_list_copy.dataframe.loc[:, 'serving'] = food_list_copy.dataframe['serving'].fillna(0)
+        """Test whether a recipe fits all the dietary rules.""" 
+        food_list_copy = food_list.copy()
+        
+        # replace serving column with servings from recipe and regram
+        food_list_copy.dataframe.drop('serving', axis=1, inplace=True)
+        food_list_copy.dataframe = pd.merge(food_list_copy.dataframe, self.dataframe[['food','serving']], how='inner', on='food')
         food_list_copy.re_gram(n_serving=True)
         
-        food_list_copy.dataframe = food_list_copy.dataframe[food_list_copy.dataframe['food'].isin(self.dataframe['food'].values)].sort_values('food').reset_index(drop=True).drop('gram_ratio', axis=1)
-        self_dataframe_copy = self.dataframe.sort_values('food').reset_index(drop=True)[food_list_copy.dataframe.columns]
+        # sort by food name and reset index, using only float columns
+        fields_to_use = [col for col in food_list_copy.dataframe.columns if food_list_copy.dataframe[col].dtype == "float64" and col != "gram_ratio"]
+        food_list_copy.dataframe = food_list_copy.dataframe.sort_values('food').reset_index(drop=True)[fields_to_use]
+        self_dataframe_copy = self.dataframe[food_list_copy.dataframe.columns][fields_to_use]
         
-        test_df = food_list_copy.dataframe == self_dataframe_copy
+        # test equivalence of dataframes, using numpy.isclose for floating points
+        test_df = pd.DataFrame(np.isclose(food_list_copy.dataframe, self_dataframe_copy), columns=fields_to_use)
         
         result_cols = test_df.all()
         result_final = test_df.values.all()
         
-        if print_results:
-        
-            if not result_final:
-                print(result_cols)
-                
-            k_print("Food list test found " + str(result_final))
+        test_print(result_final, result_cols, "Food list", verbose=print_results)
         
         return result_final
     
@@ -194,6 +205,65 @@ class Recipe(FoodListBase):
         
         return result
 
+        
+    def test_compare_foods(self, diet, print_results=True):
+        """Test whether last replacement moved closer to all goals."""
+        current_row = self.log_by_sum.iloc[-1].fillna(0)
+        prior_row = self.log_by_sum.iloc[-2].fillna(0)
+
+        for column in [rule[0] for rule in diet.foodgroup_rules]:
+            for row in [current_row, prior_row]:
+                if column not in row.index:
+                    row[column] = 0
+                
+        conditionals = bool(True)
+        conditionals_dict = dict()
+
+        for name, conditional, values in self.test_compare_foods_keyfields(diet, current_row, prior_row):
+            conditionals &= conditional
+            conditionals_dict[name] = conditional, values
+            
+        maxday_name, maxday_conditional, maxday_values = self.test_compare_foods_maxday(current_row)
+        conditionals &= maxday_conditional
+        conditionals_dict[maxday_name] = maxday_conditional, maxday_values
+        
+        test_print(conditionals, conditionals_dict, "Compare foods", verbose=print_results)
+        
+        return conditionals
+
+    
+    def test_compare_foods_keyfields(self, diet, current_row, prior_row):
+        """Test whether last replacement moved closer to all goals."""
+        rules = list()
+        rules.extend(diet.nutrient_rules)
+        rules.extend(diet.calorie_range)
+        rules.extend(diet.foodgroup_rules)
+        
+        for rule in rules:
+            target = (rule[1] + rule[2])/2
+            old_recipe_diff = abs(prior_row[rule[0]] - target)
+            new_recipe_diff = abs(current_row[rule[0]] - target)
+            
+            boolean_rule = (
+                ( (rule[1] <= current_row[rule[0]]) & (current_row[rule[0]] <= rule[2]) )
+                | (new_recipe_diff <= old_recipe_diff)
+            )
+            
+            yield rule[0], boolean_rule, (current_row[rule[0]], prior_row[rule[0]])
+
+
+    def test_compare_foods_maxday(self, current_row):
+        """Test whether last replacement moved closer to all goals.
+        Check that recent replacement did not go over maximum amount."""
+        new_food_row = self.dataframe.loc[self.dataframe["food"] == current_row["food_added"], :].iloc[0]
+        maxday_rule = (
+            ( new_food_row["gram"] <= new_food_row["max_grams_day"] )
+            | ( new_food_row["max_grams_day"] == -1 )
+        )
+        
+        
+        return "max_grams_day", maxday_rule, (new_food_row["food"], new_food_row["gram"])
+        
 
     def test(self, diet, food_list, print_results=True):
         """Test that a recipe fits all the rules and is correctly constituted from the food list."""
@@ -209,7 +279,8 @@ class Recipe(FoodListBase):
         out_grocery_df.to_csv(dest, index=True)
         
         if detail:
-            out_df = self.dataframe
+            columns = order_columns(self.dataframe.columns.tolist())
+            out_df = self.dataframe[columns]
             out_df.to_csv(detail_dest, index=False)
         
         if log_on:
@@ -221,11 +292,11 @@ class Recipe(FoodListBase):
     
     
     def write_name(self, name):
-        """Write out a name for the recipe.  Default is 'recipe'."""
+        """Write out a name for the recipe.  Default is 'day'."""
         if not name:
-            return "recipe"
+            self.__name = "day"
         else:
-            return name
+            self.__name = name
     
     
     def write_instructions(self):
